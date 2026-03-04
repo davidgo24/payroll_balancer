@@ -1,0 +1,501 @@
+/* Payroll Balancer — functional, clear hierarchy */
+:root {
+  --bg: #0f1419;
+  --bg-card: #1a2332;
+  --border: #2d3a4a;
+  --text: #e6edf3;
+  --text-muted: #8b949e;
+  --accent: #58a6ff;
+  --accent-hover: #79b8ff;
+  --success: #3fb950;
+  --warn: #d29922;
+  --danger: #f85149;
+  --radius: 8px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: "IBM Plex Sans", system-ui, -apple-system, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+}
+
+.app {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 1.5rem;
+}
+
+.app-header {
+  margin-bottom: 1.5rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.app-header h1 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin: 0;
+  color: var(--text);
+}
+
+.app-main {
+  min-height: 60vh;
+}
+
+/* Upload screen */
+.upload-screen {
+  max-width: 480px;
+}
+
+.view-existing {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1rem;
+  margin-bottom: 1rem;
+}
+
+.view-existing label {
+  display: block;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  margin-bottom: 0.5rem;
+}
+
+.view-existing-row {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.view-existing-row select {
+  flex: 1;
+  padding: 0.5rem 0.75rem;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+}
+
+.view-existing-row button {
+  padding: 0.5rem 1rem;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.view-existing-row button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.upload-form {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.5rem;
+}
+
+.mode-tabs {
+  display: flex;
+  gap: 0;
+  margin-bottom: 1.25rem;
+}
+
+.mode-tabs button {
+  flex: 1;
+  padding: 0.6rem 1rem;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 0.95rem;
+}
+
+.mode-tabs button:first-child {
+  border-radius: var(--radius) 0 0 var(--radius);
+}
+
+.mode-tabs button:last-child {
+  border-radius: 0 var(--radius) var(--radius) 0;
+}
+
+.mode-tabs button.active {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+
+.form-group {
+  margin-bottom: 1rem;
+}
+
+.form-group label {
+  display: block;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  margin-bottom: 0.35rem;
+}
+
+.form-group input[type="date"],
+.form-group input[type="file"],
+.form-group select {
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font-size: 0.95rem;
+}
+
+.form-group.checkbox label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+}
+
+.form-group.checkbox input {
+  margin: 0;
+}
+
+.warning {
+  font-size: 0.8rem;
+  color: var(--warn);
+  margin: 0.35rem 0 0;
+}
+
+.error {
+  color: var(--danger);
+  font-size: 0.9rem;
+  margin: 0.75rem 0;
+}
+
+.upload-form > button[type="submit"] {
+  width: 100%;
+  padding: 0.7rem 1.25rem;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius);
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.upload-form > button[type="submit"]:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+
+.upload-form > button[type="submit"]:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Results screen */
+.results-screen {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.results-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.results-header h2 {
+  margin: 0;
+  font-size: 1.25rem;
+}
+
+.period-range {
+  color: var(--text-muted);
+  margin: 0;
+}
+
+.btn-reset {
+  margin-left: auto;
+  padding: 0.4rem 0.9rem;
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.btn-reset:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.skipped-banner {
+  background: rgba(210, 153, 34, 0.15);
+  border: 1px solid var(--warn);
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius);
+  font-size: 0.9rem;
+}
+
+.results-body {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  gap: 1.5rem;
+  min-height: 500px;
+}
+
+.employee-sidebar {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.75rem;
+  overflow: auto;
+}
+
+.filters {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.filters input[type="search"] {
+  padding: 0.4rem 0.6rem;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+}
+
+.filters select {
+  padding: 0.4rem 0.6rem;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+}
+
+.employee-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.employee-list li {
+  padding: 0.5rem 0.6rem;
+  cursor: pointer;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.employee-list li:hover {
+  background: rgba(88, 166, 255, 0.1);
+}
+
+.employee-list li.selected {
+  background: rgba(88, 166, 255, 0.2);
+}
+
+.emp-id {
+  font-weight: 600;
+  min-width: 3.5rem;
+}
+
+.emp-name {
+  flex: 1;
+  font-size: 0.9rem;
+  color: var(--text-muted);
+}
+
+.badge {
+  background: var(--danger);
+  color: #fff;
+  font-size: 0.75rem;
+  padding: 0.15rem 0.4rem;
+  border-radius: 999px;
+}
+
+.employee-detail {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.25rem;
+  overflow: auto;
+}
+
+.hint {
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.totals-row {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin: 1rem 0;
+}
+
+.totals-box {
+  flex: 1;
+  min-width: 140px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.75rem 1rem;
+}
+
+.totals-box h4 {
+  margin: 0 0 0.5rem;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.totals-dl {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.25rem 1rem;
+  font-size: 0.9rem;
+  margin: 0;
+}
+
+.totals-dl dt {
+  color: var(--text-muted);
+  margin: 0;
+}
+
+.weekly-hints {
+  margin: 0.75rem 0;
+}
+
+.hint-box {
+  background: rgba(88, 166, 255, 0.1);
+  border-left: 4px solid var(--accent);
+  padding: 0.5rem 0.75rem;
+  margin: 0.35rem 0;
+  font-size: 0.9rem;
+}
+
+.flags-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin: 0.75rem 0;
+}
+
+.flag-pill {
+  font-size: 0.75rem;
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+}
+
+.flag-pill.high {
+  background: rgba(248, 81, 73, 0.25);
+  color: #f85149;
+}
+
+.flag-pill.medium {
+  background: rgba(210, 153, 34, 0.25);
+  color: var(--warn);
+}
+
+.flag-pill.low {
+  background: rgba(139, 148, 158, 0.25);
+  color: var(--text-muted);
+}
+
+.grid-section {
+  margin: 1rem 0;
+}
+
+.bank-snapshot {
+  margin: 1rem 0;
+}
+
+.bank-snapshot h4 {
+  margin: 0 0 0.5rem;
+  font-size: 0.9rem;
+  color: var(--text-muted);
+}
+
+.bank-table {
+  width: 100%;
+  max-width: 400px;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.bank-table th,
+.bank-table td {
+  padding: 0.4rem 0.6rem;
+  border: 1px solid var(--border);
+  text-align: right;
+}
+
+.bank-table th {
+  background: var(--bg);
+  color: var(--text-muted);
+  text-align: left;
+}
+
+.bank-table td.negative {
+  color: var(--danger);
+}
+
+.grid-section h4 {
+  margin: 0 0 0.5rem;
+  font-size: 0.9rem;
+  color: var(--text-muted);
+}
+
+.grid-wrap {
+  overflow-x: auto;
+}
+
+.hours-grid {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.hours-grid th,
+.hours-grid td {
+  padding: 0.4rem 0.6rem;
+  border: 1px solid var(--border);
+  text-align: left;
+}
+
+.hours-grid th {
+  background: var(--bg);
+  color: var(--text-muted);
+}
+
+.suggestions-section {
+  margin-top: 1rem;
+}
+
+.suggestions-section summary {
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.suggestions-section ul {
+  margin: 0.5rem 0 0;
+  padding-left: 1.25rem;
+}
+
+.suggestions-section li {
+  margin: 0.25rem 0;
+  font-size: 0.9rem;
+}
