@@ -1,0 +1,9 @@
+# Railway deployment config
+# Uses Dockerfile by default. Add a Volume and set DATABASE_PATH=/data/payroll.db for persistence.
+
+[build]
+builder = "DOCKERFILE"
+
+[deploy]
+healthcheckPath = "/"
+healthcheckTimeout = 300

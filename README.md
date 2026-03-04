@@ -57,6 +57,13 @@ Use your 2.22-2.28.26.csv (week 1) and AccrualBalanceReport.xlsx:
 
 For append: upload week 2 CSV later with "Append Week 2" + select period 2026-03-07.
 
+## Deploy to Railway
+
+1. Push to GitHub and connect repo in [Railway](https://railway.app).
+2. Add a **Volume** (Settings → Volumes) and set mount path to `/data`.
+3. Add variable: `DATABASE_PATH=/data/payroll.db` (for persistent SQLite).
+4. Deploy. Railway uses the Dockerfile and serves the app at the generated URL.
+
 ## Tests
 
 ```bash

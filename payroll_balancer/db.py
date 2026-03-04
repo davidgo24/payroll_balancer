@@ -2,11 +2,14 @@
 SQLite persistence — periods, hours, accrual snapshot, duplicate hash protection.
 """
 import json
+import os
 import sqlite3
 from pathlib import Path
 from typing import Any
 
-DB_PATH = Path(__file__).parent.parent / "data" / "payroll.db"
+# Use DATABASE_PATH for Railway Volume (e.g. /data/payroll.db); default local data/
+_default_db = Path(__file__).parent.parent / "data" / "payroll.db"
+DB_PATH = Path(env) if (env := os.environ.get("DATABASE_PATH")) else _default_db
 
 
 def get_connection():
@@ -79,6 +82,32 @@ def list_period_ids() -> list[str]:
     try:
         rows = conn.execute("SELECT id FROM periods ORDER BY id DESC").fetchall()
         return [r["id"] for r in rows]
+    finally:
+        conn.close()
+
+
+def delete_period(period_id: str) -> bool:
+    """Delete a period and its hours. Returns True if deleted."""
+    conn = get_connection()
+    try:
+        cur = conn.execute("DELETE FROM hours WHERE period_id = ?", (period_id,))
+        conn.execute("DELETE FROM periods WHERE id = ?", (period_id,))
+        conn.commit()
+        return True
+    finally:
+        conn.close()
+
+
+def delete_all_periods() -> int:
+    """Delete all periods and hours. Returns number of periods deleted. Use for testing/reset."""
+    conn = get_connection()
+    try:
+        cur = conn.execute("SELECT COUNT(*) FROM periods")
+        n = cur.fetchone()[0]
+        conn.execute("DELETE FROM hours")
+        conn.execute("DELETE FROM periods")
+        conn.commit()
+        return n
     finally:
         conn.close()
 

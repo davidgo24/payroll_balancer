@@ -60,11 +60,35 @@ body {
   margin-bottom: 1rem;
 }
 
-.view-existing label {
-  display: block;
+.view-existing-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.view-existing-header label {
   font-size: 0.85rem;
   color: var(--text-muted);
-  margin-bottom: 0.5rem;
+  margin: 0;
+}
+
+.view-existing .btn-clear-all {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
+  background: transparent;
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+
+.view-existing .btn-clear-all:hover {
+  color: var(--danger);
+  border-color: var(--danger);
+}
+
+.view-existing-header + .view-existing-row {
+  margin-top: 0.5rem;
 }
 
 .view-existing-row {

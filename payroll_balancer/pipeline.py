@@ -10,6 +10,11 @@ from payroll_balancer.config.codes import (
     REG_LIKE_CODES,
     PREMIUM_CODES,
     LWOP_CODE,
+    REG_CODE,
+    OT_15_CODE,
+    CT_EARN_15_CODE,
+    OT_10_CODE,
+    CT_EARN_10_CODE,
     code_draws_from_bank,
 )
 from payroll_balancer.rules.leave_check import leave_check
@@ -160,8 +165,9 @@ def run_pipeline(
 
         cells = {d: c for d, c in cells.items() if c}
         cells = _cap_documented_at_40(cells, period_start)
-        codes = sorted(set(original_codes) | new_codes)
-        return {"dates": dates_with_dow, "codes": codes, "cells": cells}
+        cells, reg_cap_flag = _cap_reg_at_40(cells, period_start, original_cells)
+        codes = sorted(set(original_codes) | new_codes | {c for cc in cells.values() for c in cc})
+        return {"dates": dates_with_dow, "codes": codes, "cells": cells}, reg_cap_flag
 
     def _cap_documented_at_40(cells: dict, period_start: str) -> dict:
         """When a week's documented > 40, reduce LWOP (from end of week first) to cap at 40."""
@@ -204,6 +210,64 @@ def run_pipeline(
                     del cells[date][LWOP_CODE]
                 excess -= reduce_by
         return {d: c for d, c in cells.items() if c}
+
+    def _cap_reg_at_40(
+        cells: dict, period_start: str, original_cells: dict
+    ) -> tuple[dict, dict | None]:
+        """When paid+premium > 40 for a week, reduce REG FT by excess, add to OT 1.0 or CT EARN 1.0.
+        Heuristic: use OT 1.0 if employee had more OT 1.5 than CT EARN 1.5 in original, else CT EARN 1.0.
+        Returns (cells, flag_or_none). Flag added when cap applied — heads up to verify employee preference.
+        """
+        ot15 = sum(
+            float(hrs) for code_hrs in original_cells.values()
+            for code, hrs in code_hrs.items()
+            if str(code).strip() == OT_15_CODE
+        )
+        ct15 = sum(
+            float(hrs) for code_hrs in original_cells.values()
+            for code, hrs in code_hrs.items()
+            if str(code).strip() == CT_EARN_15_CODE
+        )
+        target_code = OT_10_CODE if ot15 >= ct15 else CT_EARN_10_CODE
+        reg_cap_flag = None
+
+        for week in (1, 2):
+            paid = sum(
+                float(hrs) for d, code_hrs in cells.items()
+                for code, hrs in code_hrs.items()
+                if get_week_fn(d, period_start) == week and code in REG_LIKE_CODES
+            )
+            premium = sum(
+                float(hrs) for d, code_hrs in cells.items()
+                for code, hrs in code_hrs.items()
+                if get_week_fn(d, period_start) == week and code in PREMIUM_CODES
+            )
+            if round(paid + premium, 2) <= 40:
+                continue
+            excess = round((paid + premium) - 40, 2)
+            dates_in_week = [d for d in cells if get_week_fn(d, period_start) == week]
+            dates_with_reg = sorted(
+                [d for d in dates_in_week if cells.get(d, {}).get(REG_CODE, 0) > 0],
+                reverse=True,
+            )
+            for date in dates_with_reg:
+                if excess <= 0:
+                    break
+                current = float(cells[date].get(REG_CODE, 0))
+                reduce_by = round(min(excess, current), 2)
+                if reduce_by <= 0:
+                    continue
+                cells[date][REG_CODE] = round(current - reduce_by, 2)
+                if cells[date][REG_CODE] <= 0:
+                    del cells[date][REG_CODE]
+                cells[date][target_code] = round(cells[date].get(target_code, 0) + reduce_by, 2)
+                excess -= reduce_by
+                reg_cap_flag = {
+                    "code": "REG_OT_CAP",
+                    "severity": "MEDIUM",
+                    "message": f"Excess REG converted to {target_code} — verify employee preference",
+                }
+        return {d: c for d, c in cells.items() if c}, reg_cap_flag
 
     def _totals_from_proposed_grid(cells: dict, period_start: str) -> dict:
         """Compute weekly and period totals from proposed grid cells. Same structure as weekly/period totals."""
@@ -286,10 +350,12 @@ def run_pipeline(
         proposed_grid = None
         proposed_totals = None
         if emp_suggestions:
-            proposed_grid = _build_proposed_grid(
+            proposed_grid, reg_cap_flag = _build_proposed_grid(
                 original_cells, emp_suggestions, dates_with_dow, pivot["codes"]
             )
             proposed_totals = _totals_from_proposed_grid(proposed_grid["cells"], period_start)
+            if reg_cap_flag:
+                emp_flags = list(emp_flags) + [reg_cap_flag]
 
         employees.append({"emp_id": emp_id, "name": name, "flagCount": flag_count})
 

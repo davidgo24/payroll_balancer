@@ -9,7 +9,7 @@ export default function UploadScreen({ onRun, onLoadPeriod, loading, error }) {
   const [tcpFile, setTcpFile] = useState(null)
   const [accrualFile, setAccrualFile] = useState(null)
 
-  useEffect(() => {
+  const fetchPeriods = () => {
     fetch('/api/periods')
       .then((r) => {
         if (!r.ok) throw new Error(`Backend returned ${r.status}`)
@@ -17,7 +17,20 @@ export default function UploadScreen({ onRun, onLoadPeriod, loading, error }) {
       })
       .then((d) => setPeriodIds(d.periodIds || []))
       .catch(() => setPeriodIds([]))
-  }, [])
+  }
+
+  useEffect(() => fetchPeriods(), [])
+
+  const handleClearAll = () => {
+    if (!window.confirm('Delete all stored periods? This cannot be undone.')) return
+    fetch('/api/periods?all=true', { method: 'DELETE' })
+      .then((r) => r.json())
+      .then(() => {
+        setPeriodIds([])
+        setPeriodId('')
+      })
+      .catch((err) => alert('Failed to delete: ' + (err?.message || err)))
+  }
 
   const handleSubmit = (e) => {
     e.preventDefault()
@@ -47,7 +60,12 @@ export default function UploadScreen({ onRun, onLoadPeriod, loading, error }) {
     <section className="upload-screen">
       {periodIds.length > 0 && (
         <div className="view-existing">
-          <label>View existing period</label>
+          <div className="view-existing-header">
+            <label>View existing period</label>
+            <button type="button" className="btn-clear-all" onClick={handleClearAll} title="Delete all stored periods">
+              Clear all
+            </button>
+          </div>
           <div className="view-existing-row">
             <select
               value={periodId || ''}
