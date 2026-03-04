@@ -234,6 +234,10 @@ function TotalsDisplay({ data, period }) {
 function OriginalGrid({ grid }) {
   if (!grid?.dates?.length || !grid?.codes?.length) return <p>No hours.</p>
   const cells = grid.cells || {}
+  const colTotals = {}
+  grid.codes.forEach((c) => {
+    colTotals[c] = grid.dates.reduce((sum, d) => sum + (parseFloat(cells[d.date]?.[c]) || 0), 0)
+  })
   return (
     <div className="grid-wrap">
       <table className="hours-grid">
@@ -255,6 +259,14 @@ function OriginalGrid({ grid }) {
             </tr>
           ))}
         </tbody>
+        <tfoot>
+          <tr className="grid-totals-row">
+            <td>Total</td>
+            {grid.codes.map((c) => (
+              <td key={c}>{colTotals[c] ? colTotals[c].toFixed(2) : ''}</td>
+            ))}
+          </tr>
+        </tfoot>
       </table>
     </div>
   )
