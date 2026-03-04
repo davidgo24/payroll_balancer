@@ -63,39 +63,43 @@ def leave_check(
                 balances[bank] -= hrs
                 continue
 
-            excess = hrs - balances.get(bank, 0)
+            excess = round(hrs - balances.get(bank, 0), 2)
             balances[bank] = 0
 
-            # Try fallback order; consume from first available
+            # Week-level: use full fallback banks before LWOP (partial allocation per fallback)
             fallbacks = BANK_FALLBACK_ORDER.get(bank, ["LWOP"])
-            proposed_code = "LWOP"
             for fb in fallbacks:
+                if excess <= 0:
+                    break
                 if fb == "LWOP":
-                    proposed_code = "LWOP"
+                    suggestions.append({
+                        "emp_id": emp_id,
+                        "date": date,
+                        "week": week,
+                        "original_code": code,
+                        "original_hrs": round(hrs, 2),
+                        "proposed_code": "LWOP",
+                        "proposed_hrs": round(excess, 2),
+                        "reason": f"Insufficient {bank}/VAC/COMP/AL → unpaid (document to 40)",
+                        "severity": "HIGH",
+                    })
+                    excess = 0
                     break
                 fb_bal = balances.get(fb, 0)
-                if fb_bal >= excess:
-                    proposed_code = BANK_TO_DEFAULT_CODE.get(fb, fb)
-                    balances[fb] -= excess
-                    break
-
-            if proposed_code == "LWOP":
-                reason = f"Insufficient {bank}/VAC/COMP/AL → unpaid (document to 40)"
-                severity = "HIGH"
-            else:
-                reason = f"Insufficient {bank} → fallback to {proposed_code}"
-                severity = "HIGH"
-
-            suggestions.append({
-                "emp_id": emp_id,
-                "date": date,
-                "week": week,
-                "original_code": code,
-                "original_hrs": round(hrs, 2),
-                "proposed_code": proposed_code,
-                "proposed_hrs": round(excess, 2),
-                "reason": reason,
-                "severity": severity,
-            })
+                if fb_bal > 0:
+                    use_amt = round(min(excess, fb_bal), 2)
+                    balances[fb] -= use_amt
+                    excess -= use_amt
+                    suggestions.append({
+                        "emp_id": emp_id,
+                        "date": date,
+                        "week": week,
+                        "original_code": code,
+                        "original_hrs": round(hrs, 2),
+                        "proposed_code": BANK_TO_DEFAULT_CODE.get(fb, fb),
+                        "proposed_hrs": use_amt,
+                        "reason": f"Insufficient {bank} → fallback to {BANK_TO_DEFAULT_CODE.get(fb, fb)}",
+                        "severity": "HIGH",
+                    })
 
     return suggestions

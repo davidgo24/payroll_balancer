@@ -4,7 +4,14 @@ Never mutates original df. Outputs suggestions + context.
 """
 import pandas as pd
 
-from payroll_balancer.config.codes import SKIP_CODES, BANK_DRAWS, code_draws_from_bank
+from payroll_balancer.config.codes import (
+    SKIP_CODES,
+    BANK_DRAWS,
+    REG_LIKE_CODES,
+    PREMIUM_CODES,
+    LWOP_CODE,
+    code_draws_from_bank,
+)
 from payroll_balancer.rules.leave_check import leave_check
 from payroll_balancer.rules.sick_check import sick_check
 from payroll_balancer.rules.lwop_rules import lwop_rules
@@ -121,6 +128,119 @@ def run_pipeline(
                 "message": "Guarantee with LWOP — consider GUARANTEE → LWOP",
             })
 
+    def _build_proposed_grid(original_cells, suggestions, dates_with_dow, original_codes):
+        """Apply suggestions to original grid; return proposed {dates, codes, cells}.
+        Suggestions only move the EXCESS — the portion covered by the bank stays as original code.
+        E.g. 8.72 SICK with 7.32 bank → 7.32 stays SICK, 1.4 moves to VAC. Subtract proposed_hrs from
+        original_code (the amount being reallocated), add to proposed_code.
+        """
+        import copy
+
+        cells = copy.deepcopy(original_cells)
+        new_codes: set[str] = set()
+
+        for s in suggestions:
+            date = str(s["date"])
+            orig_code = s["original_code"]
+            prop_code = s["proposed_code"]
+            prop_hrs = s["proposed_hrs"]  # amount being moved (excess only)
+
+            if date not in cells:
+                cells[date] = {}
+            if date in cells and orig_code in cells[date]:
+                cells[date][orig_code] = round(cells[date][orig_code] - prop_hrs, 2)
+                if cells[date][orig_code] <= 0:
+                    del cells[date][orig_code]
+            if not cells.get(date):
+                cells[date] = {}
+
+            cells[date][prop_code] = round(cells[date].get(prop_code, 0) + prop_hrs, 2)
+            if prop_code not in original_codes:
+                new_codes.add(prop_code)
+
+        cells = {d: c for d, c in cells.items() if c}
+        cells = _cap_documented_at_40(cells, period_start)
+        codes = sorted(set(original_codes) | new_codes)
+        return {"dates": dates_with_dow, "codes": codes, "cells": cells}
+
+    def _cap_documented_at_40(cells: dict, period_start: str) -> dict:
+        """When a week's documented > 40, reduce LWOP (from end of week first) to cap at 40."""
+        for week in (1, 2):
+            dates_in_week = [d for d in cells if get_week_fn(d, period_start) == week]
+            if not dates_in_week:
+                continue
+            paid = sum(
+                float(hrs) for d, code_hrs in cells.items()
+                for code, hrs in code_hrs.items()
+                if get_week_fn(d, period_start) == week and code in REG_LIKE_CODES
+            )
+            premium = sum(
+                float(hrs) for d, code_hrs in cells.items()
+                for code, hrs in code_hrs.items()
+                if get_week_fn(d, period_start) == week and code in PREMIUM_CODES
+            )
+            lwop = sum(
+                float(hrs) for d, code_hrs in cells.items()
+                for code, hrs in code_hrs.items()
+                if get_week_fn(d, period_start) == week and code == LWOP_CODE
+            )
+            documented = round(paid + premium + lwop, 2)
+            if documented <= 40:
+                continue
+            excess = round(documented - 40, 2)
+            dates_with_lwop = sorted(
+                [d for d in dates_in_week if cells.get(d, {}).get(LWOP_CODE, 0) > 0],
+                reverse=True,
+            )
+            for date in dates_with_lwop:
+                if excess <= 0:
+                    break
+                current = float(cells[date].get(LWOP_CODE, 0))
+                reduce_by = round(min(excess, current), 2)
+                if reduce_by <= 0:
+                    continue
+                cells[date][LWOP_CODE] = round(current - reduce_by, 2)
+                if cells[date][LWOP_CODE] <= 0:
+                    del cells[date][LWOP_CODE]
+                excess -= reduce_by
+        return {d: c for d, c in cells.items() if c}
+
+    def _totals_from_proposed_grid(cells: dict, period_start: str) -> dict:
+        """Compute weekly and period totals from proposed grid cells. Same structure as weekly/period totals."""
+        w1 = {"paid": 0.0, "premium": 0.0, "lwop": 0.0, "documented": 0.0, "otOver40": 0.0}
+        w2 = {"paid": 0.0, "premium": 0.0, "lwop": 0.0, "documented": 0.0, "otOver40": 0.0}
+        for date, code_hrs in cells.items():
+            week = get_week_fn(date, period_start)
+            if week not in (1, 2):
+                continue
+            target = w1 if week == 1 else w2
+            for code, hrs in code_hrs.items():
+                code = str(code).strip()
+                hrs = float(hrs)
+                if code in REG_LIKE_CODES:
+                    target["paid"] += hrs
+                elif code in PREMIUM_CODES:
+                    target["premium"] += hrs
+                elif code == LWOP_CODE:
+                    target["lwop"] += hrs
+        for w in (w1, w2):
+            w["documented"] = round(w["paid"] + w["premium"] + w["lwop"], 2)
+            over40 = (w["paid"] + w["premium"]) - 40
+            w["otOver40"] = round(max(0, over40), 2)
+            w["paid"] = round(w["paid"], 2)
+            w["premium"] = round(w["premium"], 2)
+            w["lwop"] = round(w["lwop"], 2)
+        return {
+            "week1": w1,
+            "week2": w2,
+            "period": {
+                "paid": round(w1["paid"] + w2["paid"], 2),
+                "premium": round(w1["premium"] + w2["premium"], 2),
+                "lwop": round(w1["lwop"] + w2["lwop"], 2),
+                "documented": round(w1["documented"] + w2["documented"], 2),
+            },
+        }
+
     # Bank snapshots per employee
     def _bank_snapshot(emp_id: str, emp_df: pd.DataFrame) -> dict:
         acc = accrual.get(emp_id) or {}
@@ -151,20 +271,32 @@ def run_pipeline(
 
         pivot = pivot_to_grid(emp_df)
         dates_with_dow = add_day_of_week(pivot["dates"])
+        original_cells = pivot["cells"].get(emp_id, {})
         original_grid = {
             "dates": dates_with_dow,
             "codes": pivot["codes"],
-            "cells": pivot["cells"].get(emp_id, {}),
+            "cells": original_cells,
         }
 
         emp_suggestions = [s for s in all_suggestions if s["emp_id"] == emp_id]
         emp_flags = flags_by_emp.get(emp_id, [])
         flag_count = len(emp_flags)
 
+        # Proposed grid: apply suggestions to get resulting hours by date and code
+        proposed_grid = None
+        proposed_totals = None
+        if emp_suggestions:
+            proposed_grid = _build_proposed_grid(
+                original_cells, emp_suggestions, dates_with_dow, pivot["codes"]
+            )
+            proposed_totals = _totals_from_proposed_grid(proposed_grid["cells"], period_start)
+
         employees.append({"emp_id": emp_id, "name": name, "flagCount": flag_count})
 
         per_employee[emp_id] = {
             "originalGrid": original_grid,
+            "proposedGrid": proposed_grid,
+            "proposedTotals": proposed_totals,
             "bankSnapshot": bank_snapshot,
             "suggestions": emp_suggestions,
             "weeklyTotals": weekly_totals.get(emp_id, {"week1": {}, "week2": {}}),

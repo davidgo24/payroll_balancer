@@ -137,13 +137,41 @@ export default function ResultsScreen({ result, onReset }) {
                 <OriginalGrid grid={emp?.originalGrid} />
               </div>
 
+              {emp?.proposedGrid && (
+                <>
+                  <div className="proposed-totals-section">
+                    <h4>Proposed totals</h4>
+                    <p className="grid-hint">Totals after applying all suggestions</p>
+                    <div className="totals-row">
+                      <div className="totals-box">
+                        <h4>Week 1</h4>
+                        <TotalsDisplay data={emp.proposedTotals?.week1} />
+                      </div>
+                      <div className="totals-box">
+                        <h4>Week 2</h4>
+                        <TotalsDisplay data={emp.proposedTotals?.week2} />
+                      </div>
+                      <div className="totals-box">
+                        <h4>Period</h4>
+                        <TotalsDisplay data={emp.proposedTotals?.period} period />
+                      </div>
+                    </div>
+                  </div>
+                  <div className="grid-section proposed-grid-section">
+                    <h4>Proposed grid</h4>
+                    <p className="grid-hint">Result after applying all suggestions — copy into your spreadsheet</p>
+                    <OriginalGrid grid={emp.proposedGrid} />
+                  </div>
+                </>
+              )}
+
               {emp?.suggestions?.length > 0 && (
                 <details className="suggestions-section">
                   <summary>Proposed changes ({emp.suggestions.length})</summary>
                   <ul>
                     {emp.suggestions.map((s, i) => (
                       <li key={i}>
-                        {s.original_hrs} {s.original_code} → {s.proposed_hrs} {s.proposed_code}: {s.reason}
+                        <span className="suggestion-date">{formatSuggestionDate(s.date)}</span> — {s.original_hrs} {s.original_code} → {s.proposed_hrs} {s.proposed_code}: {s.reason}
                       </li>
                     ))}
                   </ul>
@@ -155,6 +183,12 @@ export default function ResultsScreen({ result, onReset }) {
       </div>
     </section>
   )
+}
+
+function formatSuggestionDate(dateStr) {
+  if (!dateStr) return ''
+  const d = new Date(dateStr)
+  return `${d.getMonth() + 1}/${d.getDate()}/${d.getFullYear()}`
 }
 
 function BankTable({ snapshot }) {

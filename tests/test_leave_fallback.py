@@ -28,6 +28,21 @@ def test_sick_to_vac_fallback():
     assert "fallback" in s["reason"].lower() or "VAC" in s["reason"]
 
 
+def test_sick_partial_vac_then_lwop():
+    """Use full VAC before LWOP when VAC has partial room."""
+    df = pd.DataFrame([
+        {"emp_id": "1020", "date": "2026-02-22", "hrs": 10, "code": "SICK PAY"},
+    ])
+    accrual = {"1020": {"SICK": 0, "VAC": 4, "AL": 0, "COMP": 0}}
+    period_start = "2026-02-16"
+    suggestions = leave_check(df, accrual, period_start, get_week)
+    assert len(suggestions) == 2
+    vac = next(s for s in suggestions if s["proposed_code"] == "VAC PAY")
+    lwop = next(s for s in suggestions if s["proposed_code"] == "LWOP")
+    assert vac["proposed_hrs"] == 4.0
+    assert lwop["proposed_hrs"] == 6.0
+
+
 def test_sick_to_lwop_when_no_fallback():
     df = pd.DataFrame([
         {"emp_id": "1020", "date": "2026-02-22", "hrs": 8, "code": "SICK PAY"},

@@ -459,6 +459,26 @@ body {
   color: var(--text-muted);
 }
 
+.grid-hint {
+  margin: -0.25rem 0 0.5rem;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.proposed-totals-section {
+  margin-top: 1.5rem;
+}
+
+.proposed-totals-section > h4 {
+  margin: 0 0 0.25rem;
+  font-size: 0.9rem;
+  color: var(--text-muted);
+}
+
+.proposed-grid-section .hours-grid {
+  border-color: var(--accent);
+}
+
 .grid-wrap {
   overflow-x: auto;
 }
@@ -498,4 +518,10 @@ body {
 .suggestions-section li {
   margin: 0.25rem 0;
   font-size: 0.9rem;
+}
+
+.suggestions-section .suggestion-date {
+  font-weight: 600;
+  color: var(--text-muted);
+  margin-right: 0.25rem;
 }
