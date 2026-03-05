@@ -413,6 +413,25 @@ def run_pipeline(
             "flags": emp_flags,
         }
 
+    # Employees whose proposed totals aren't at target: 40 reg (or 40 documented if LWOP)
+    needs_review = []
+    for emp_id in per_employee:
+        pe = per_employee[emp_id]
+        pt = pe.get("proposedTotals")
+        if not pt or not pt.get("period"):
+            continue
+        period = pt["period"]
+        paid = float(period.get("paid") or 0)
+        lwop = float(period.get("lwop") or 0)
+        documented = float(period.get("documented") or 0)
+        name = (accrual.get(emp_id) or {}).get("name", "") or emp_id
+        if lwop > 0:
+            if abs(documented - 40) > 0.01:
+                needs_review.append({"emp_id": emp_id, "name": name, "reason": f"Documented {documented} ≠ 40 (LWOP)"})
+        else:
+            if abs(paid - 40) > 0.01:
+                needs_review.append({"emp_id": emp_id, "name": name, "reason": f"Regular Hrs {paid} ≠ 40"})
+
     return {
         "periodId": period_end,
         "periodStart": period_start,
@@ -420,4 +439,5 @@ def run_pipeline(
         "employees": employees,
         "skipped": skipped,
         "perEmployee": per_employee,
+        "needsReview": needs_review,
     }

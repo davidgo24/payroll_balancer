@@ -270,6 +270,62 @@ body {
   font-size: 0.9rem;
 }
 
+.needs-review-banner {
+  background: rgba(248, 81, 73, 0.1);
+  border: 1px solid var(--danger);
+  padding: 1rem;
+  border-radius: var(--radius);
+  margin-bottom: 1rem;
+}
+
+.needs-review-banner h4 {
+  margin: 0 0 0.25rem;
+  font-size: 0.95rem;
+  color: var(--danger);
+}
+
+.needs-review-hint {
+  margin: 0 0 0.5rem;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.needs-review-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.needs-review-list li {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem 0.6rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.needs-review-list li:hover {
+  border-color: var(--accent);
+  background: rgba(88, 166, 255, 0.08);
+}
+
+.needs-review-list .emp-id {
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.needs-review-list .reason {
+  font-size: 0.8rem;
+  color: var(--danger);
+}
+
 .results-body {
   display: grid;
   grid-template-columns: 280px 1fr;

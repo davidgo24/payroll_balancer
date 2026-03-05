@@ -11,6 +11,7 @@ export default function ResultsScreen({ result, onReset }) {
   const employees = result.employees || []
   const perEmployee = result.perEmployee || {}
   const skipped = result.skipped || []
+  const needsReview = result.needsReview || []
 
   const filteredEmps = useMemo(() => {
     let list = employees
@@ -47,6 +48,22 @@ export default function ResultsScreen({ result, onReset }) {
       {skipped.length > 0 && (
         <div className="skipped-banner">
           Skipped ({skipped.length}): {skipped.map((s) => `${s.emp_id} ${s.name}`).join(', ')} — {skipped[0]?.reason || 'finance handles'}
+        </div>
+      )}
+
+      {needsReview.length > 0 && (
+        <div className="needs-review-banner">
+          <h4>Needs review ({needsReview.length})</h4>
+          <p className="needs-review-hint">Proposed totals not at 40 — tap to jump</p>
+          <ul className="needs-review-list">
+            {needsReview.map((r) => (
+              <li key={r.emp_id} onClick={() => setSelectedEmp(r.emp_id)}>
+                <span className="emp-id">{r.emp_id}</span>
+                <span className="emp-name">{r.name}</span>
+                <span className="reason">{r.reason}</span>
+              </li>
+            ))}
+          </ul>
         </div>
       )}
 
