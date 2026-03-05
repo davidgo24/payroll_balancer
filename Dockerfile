@@ -25,4 +25,5 @@ ENV PYTHONUNBUFFERED=1
 ENV PYTHONPATH=/app
 
 EXPOSE 8000
+# Railway injects PORT at runtime; shell form expands it
 CMD uvicorn api.main:app --host 0.0.0.0 --port ${PORT:-8000}

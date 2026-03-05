@@ -55,6 +55,12 @@ def startup():
     init_db()
 
 
+@app.get("/api/health")
+def health():
+    """Lightweight health check for Railway/deploy — avoids loading SPA."""
+    return {"status": "ok"}
+
+
 def get_week_fn(date_str: str, period_start: str) -> int:
     return get_week_number(date_str, period_start)
 
