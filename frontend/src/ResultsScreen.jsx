@@ -156,6 +156,11 @@ export default function ResultsScreen({ result, onReset }) {
 
               {emp?.proposedGrid && (
                 <>
+                  {emp?.flags?.some((f) => f.code === 'REG_OT_CAP') && (
+                    <div className="proposed-alert reg-ot-alert">
+                      <strong>REG/OT conversion applied</strong> — We converted REG hrs ↔ OT/CT 1.0 to reach 40. Double-check the OT bucket (OT 1.0 vs CT EARN 1.0) matches what the employee would want.
+                    </div>
+                  )}
                   <div className="proposed-totals-section">
                     <h4>Proposed totals</h4>
                     <p className="grid-hint">Totals after applying all suggestions</p>

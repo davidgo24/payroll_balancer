@@ -545,6 +545,21 @@ body {
   color: var(--text-muted);
 }
 
+.proposed-alert.reg-ot-alert {
+  margin-bottom: 1rem;
+  padding: 0.75rem 1rem;
+  background: rgba(210, 153, 34, 0.2);
+  border: 1px solid var(--warn);
+  border-radius: var(--radius);
+  font-size: 0.9rem;
+}
+
+.proposed-alert.reg-ot-alert strong {
+  display: block;
+  margin-bottom: 0.25rem;
+  color: var(--warn);
+}
+
 .proposed-totals-section {
   margin-top: 1.5rem;
 }

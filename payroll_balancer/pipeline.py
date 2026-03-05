@@ -279,7 +279,7 @@ def run_pipeline(
                     reg_cap_flag = {
                         "code": "REG_OT_CAP",
                         "severity": "MEDIUM",
-                        "message": f"Excess REG converted to {target_code} — verify employee preference",
+                        "message": f"REG hrs converted to {target_code} to cap at 40 — double-check OT bucket (OT 1.0 vs CT EARN 1.0) with employee",
                     }
             else:
                 # Fill paid to 40: OT/CT 1.0 → REG FT (take from 1.0x premium, end of week first)
@@ -305,7 +305,7 @@ def run_pipeline(
                         reg_cap_flag = {
                             "code": "REG_OT_CAP",
                             "severity": "MEDIUM",
-                            "message": f"Premium {pcode} converted to REG FT to reach 40 — verify employee preference",
+                            "message": f"Premium ({pcode}) converted to REG FT to reach 40 — double-check OT bucket was correct for employee",
                         }
                         break
 
