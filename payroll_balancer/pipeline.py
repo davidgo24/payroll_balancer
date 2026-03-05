@@ -214,9 +214,11 @@ def run_pipeline(
     def _cap_reg_at_40(
         cells: dict, period_start: str, original_cells: dict
     ) -> tuple[dict, dict | None]:
-        """When paid+premium > 40 for a week, reduce REG FT by excess, add to OT 1.0 or CT EARN 1.0.
-        Heuristic: use OT 1.0 if employee had more OT 1.5 than CT EARN 1.5 in original, else CT EARN 1.0.
-        Returns (cells, flag_or_none). Flag added when cap applied — heads up to verify employee preference.
+        """Balance paid to 40 when paid+premium > 40.
+        - paid > 40: convert REG FT → OT/CT 1.0 (reduce paid)
+        - paid < 40: convert OT/CT 1.0 → REG FT (fill paid to 40)
+        Heuristic for OT vs CT EARN: use whichever employee had more of (1.5) in original.
+        Returns (cells, flag_or_none). Flag when cap applied — verify employee preference.
         """
         ot15 = sum(
             float(hrs) for code_hrs in original_cells.values()
@@ -231,6 +233,8 @@ def run_pipeline(
         target_code = OT_10_CODE if ot15 >= ct15 else CT_EARN_10_CODE
         reg_cap_flag = None
 
+        PREMIUM_10_CODES = (OT_10_CODE, CT_EARN_10_CODE)
+
         for week in (1, 2):
             paid = sum(
                 float(hrs) for d, code_hrs in cells.items()
@@ -242,31 +246,69 @@ def run_pipeline(
                 for code, hrs in code_hrs.items()
                 if get_week_fn(d, period_start) == week and code in PREMIUM_CODES
             )
+            paid = round(paid, 2)
+            premium = round(premium, 2)
             if round(paid + premium, 2) <= 40:
                 continue
-            excess = round((paid + premium) - 40, 2)
-            dates_in_week = [d for d in cells if get_week_fn(d, period_start) == week]
-            dates_with_reg = sorted(
-                [d for d in dates_in_week if cells.get(d, {}).get(REG_CODE, 0) > 0],
+
+            # How much to move: when paid>40 reduce REG; when paid<40 fill from premium
+            if paid > 40:
+                amount_to_move = round(paid - 40, 2)
+            else:
+                amount_to_move = round((paid + premium) - 40, 2)  # unused in fill branch
+            dates_in_week = sorted(
+                [d for d in cells if get_week_fn(d, period_start) == week],
                 reverse=True,
             )
-            for date in dates_with_reg:
-                if excess <= 0:
-                    break
-                current = float(cells[date].get(REG_CODE, 0))
-                reduce_by = round(min(excess, current), 2)
-                if reduce_by <= 0:
+
+            if paid > 40:
+                # Reduce paid: REG FT → OT/CT 1.0 (move paid-40 from REG to premium)
+                dates_with_reg = [d for d in dates_in_week if cells.get(d, {}).get(REG_CODE, 0) > 0]
+                for date in dates_with_reg:
+                    if amount_to_move <= 0:
+                        break
+                    current = float(cells[date].get(REG_CODE, 0))
+                    reduce_by = round(min(amount_to_move, current), 2)
+                    if reduce_by <= 0:
+                        continue
+                    cells[date][REG_CODE] = round(current - reduce_by, 2)
+                    if cells[date][REG_CODE] <= 0:
+                        del cells[date][REG_CODE]
+                    cells[date][target_code] = round(cells[date].get(target_code, 0) + reduce_by, 2)
+                    amount_to_move -= reduce_by
+                    reg_cap_flag = {
+                        "code": "REG_OT_CAP",
+                        "severity": "MEDIUM",
+                        "message": f"Excess REG converted to {target_code} — verify employee preference",
+                    }
+            else:
+                # Fill paid to 40: OT/CT 1.0 → REG FT (take from 1.0x premium, end of week first)
+                to_convert = round(min(40 - paid, premium), 2)
+                if to_convert <= 0:
                     continue
-                cells[date][REG_CODE] = round(current - reduce_by, 2)
-                if cells[date][REG_CODE] <= 0:
-                    del cells[date][REG_CODE]
-                cells[date][target_code] = round(cells[date].get(target_code, 0) + reduce_by, 2)
-                excess -= reduce_by
-                reg_cap_flag = {
-                    "code": "REG_OT_CAP",
-                    "severity": "MEDIUM",
-                    "message": f"Excess REG converted to {target_code} — verify employee preference",
-                }
+                codes_to_try = [target_code] + [c for c in PREMIUM_10_CODES if c != target_code]
+                for date in dates_in_week:
+                    if to_convert <= 0:
+                        break
+                    for pcode in codes_to_try:
+                        if cells.get(date, {}).get(pcode, 0) <= 0:
+                            continue
+                        current = float(cells[date].get(pcode, 0))
+                        reduce_by = round(min(to_convert, current), 2)
+                        if reduce_by <= 0:
+                            continue
+                        cells[date][pcode] = round(current - reduce_by, 2)
+                        if cells[date][pcode] <= 0:
+                            del cells[date][pcode]
+                        cells[date][REG_CODE] = round(cells[date].get(REG_CODE, 0) + reduce_by, 2)
+                        to_convert -= reduce_by
+                        reg_cap_flag = {
+                            "code": "REG_OT_CAP",
+                            "severity": "MEDIUM",
+                            "message": f"Premium {pcode} converted to REG FT to reach 40 — verify employee preference",
+                        }
+                        break
+
         return {d: c for d, c in cells.items() if c}, reg_cap_flag
 
     def _totals_from_proposed_grid(cells: dict, period_start: str) -> dict:
