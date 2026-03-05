@@ -18,7 +18,15 @@ export default function App() {
       const r = await fetch(`${API_BASE}/run?period_id=${encodeURIComponent(periodId)}`)
       if (!r.ok) {
         const t = await r.text()
-        throw new Error(t || `HTTP ${r.status}`)
+        const parsed = (() => {
+          try {
+            const j = JSON.parse(t)
+            return Array.isArray(j.detail) ? j.detail.join('; ') : j.detail
+          } catch {
+            return t
+          }
+        })()
+        throw new Error(parsed || `HTTP ${r.status}`)
       }
       const data = await r.json()
       setResult(data)
@@ -42,15 +50,23 @@ export default function App() {
       })
       if (!r.ok) {
         const t = await r.text()
+        const parsed = (() => {
+          try {
+            const j = JSON.parse(t)
+            return Array.isArray(j.detail) ? j.detail.join('; ') : j.detail
+          } catch {
+            return t
+          }
+        })() || t
         if (r.status === 404) {
           throw new Error('Backend returned 404. Start it with: uvicorn api.main:app --reload --port 8001')
         }
-        if (r.status === 400 && t.includes('already exists')) {
-          const match = t.match(/Period ([0-9-]+) already exists/) || t.match(/"([^"]+)" already exists/)
+        if (r.status === 400 && (t.includes('already exists') || parsed.includes('already exists'))) {
+          const match = (parsed || t).match(/Period ([0-9-]+) already exists/) || (parsed || t).match(/"([^"]+)" already exists/)
           const pid = match ? match[1] : null
-          throw new Error(pid ? `PERIOD_EXISTS:${pid}` : t)
+          throw new Error(pid ? `PERIOD_EXISTS:${pid}` : parsed)
         }
-        throw new Error(t || `HTTP ${r.status}`)
+        throw new Error(parsed || `HTTP ${r.status}`)
       }
       const data = await r.json()
       setResult(data)

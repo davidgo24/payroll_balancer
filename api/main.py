@@ -100,7 +100,10 @@ async def get_run(period_id: str = Query(...)):
         raise HTTPException(400, "No accrual snapshot for this period")
     all_hours = get_hours(period_id)
     if not all_hours:
-        raise HTTPException(400, "No hours data for this period")
+        raise HTTPException(
+            400,
+            f"Period {period_id} exists but has no hours. Create a new period (TCP + Accrual) or append Week 2 with a TCP file.",
+        )
     import pandas as pd
     df_full = pd.DataFrame(all_hours)
     result = run_pipeline(
