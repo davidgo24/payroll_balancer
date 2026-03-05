@@ -84,6 +84,18 @@ HOURS_TOTAL_FIELD = "HTOT1"
 def _parse_date(s: str):
     from datetime import datetime
     s = str(s).strip()
+    # Strip ISO time suffix if present (e.g. "2026-02-23T00:00:00.000Z")
+    if "T" in s:
+        s = s.split("T")[0]
+    # Numeric timestamp (ms) — only if string looks like one
+    if s.replace(".", "").isdigit():
+        try:
+            ts = float(s)
+            if ts > 1e12:  # milliseconds
+                ts = ts / 1000
+            return datetime.utcfromtimestamp(ts)
+        except (ValueError, TypeError, OSError):
+            pass
     for fmt in ("%Y-%m-%d", "%m/%d/%Y", "%m-%d-%Y", "%m/%d/%y", "%m-%d-%y"):
         try:
             return datetime.strptime(s, fmt)
@@ -211,7 +223,6 @@ def fill_single_pdf(
     if ot_entries:
         (wk1_start, wk1_end), (wk2_start, wk2_end) = _pay_period_weeks(pp_end)
         weeks = _aggregate_ot_by_week(ot_entries, wk1_start, wk1_end, wk2_start, wk2_end)
-        grand_total = 0.0
         for week_idx, week in enumerate(weeks):
             if not week["has_data"]:
                 continue
@@ -220,11 +231,12 @@ def fill_single_pdf(
                 hrs = week[cat_key]
                 if hrs > 0:
                     values[OT_ROW_FIELDS[cat_key][week_idx]] = _fmt_hours(hrs)
-                grand_total += week["row_total"]
+        # Per-category totals and grand total — derive HTOT1 from category sums (single source of truth)
+        cat_totals = {k: sum(w[k] for w in weeks) for k in ("ot10", "ot15", "cte10", "cte15")}
         for cat_key in ("ot10", "ot15", "cte10", "cte15"):
-            total = sum(w[cat_key] for w in weeks)
-            if total > 0:
-                values[OT_TOTAL_FIELDS[cat_key]] = _fmt_hours(total)
+            if cat_totals[cat_key] > 0:
+                values[OT_TOTAL_FIELDS[cat_key]] = _fmt_hours(cat_totals[cat_key])
+        grand_total = sum(cat_totals.values())
         if grand_total > 0:
             values[HOURS_TOTAL_FIELD] = _fmt_hours(grand_total)
 

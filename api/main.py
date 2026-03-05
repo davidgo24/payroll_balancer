@@ -102,7 +102,8 @@ async def get_run(period_id: str = Query(...)):
     if not all_hours:
         raise HTTPException(
             400,
-            f"Period {period_id} exists but has no hours. Create a new period (TCP + Accrual) or append Week 2 with a TCP file.",
+            "No hours data for this period. The DB may be empty (e.g. after removing the volume). "
+            "Create a new period with TCP + Accrual, or append Week 2 with a TCP file.",
         )
     import pandas as pd
     df_full = pd.DataFrame(all_hours)
@@ -160,7 +161,11 @@ async def run(
         # Filter to dates within period
         df = df[(df["date"] >= period_start) & (df["date"] <= period_end)]
         if df.empty:
-            raise HTTPException(400, "No hours in TCP file fall within this period")
+            raise HTTPException(
+                400,
+                f"No hours in TCP file fall within this period. Period: {period_start} to {period_end}. "
+                "Check date format in CSV (M/D/YYYY or YYYY-MM-DD).",
+            )
 
         rows = df.to_dict("records")
         for r in rows:
@@ -195,7 +200,11 @@ async def run(
         df, file_hash = load_tcp_csv(tcp_content)
         df = df[(df["date"] >= period_start) & (df["date"] <= period_end_date)]
         if df.empty:
-            raise HTTPException(400, "No hours in TCP file fall within this period")
+            raise HTTPException(
+                400,
+                f"No hours in TCP file fall within this period. Period: {period_start} to {period_end_date}. "
+                "Check date format in CSV (M/D/YYYY or YYYY-MM-DD).",
+            )
 
         rows = df.to_dict("records")
         for r in rows:
