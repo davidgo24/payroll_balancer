@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useCallback } from 'react'
 
 const SEVERITY_ORDER = { HIGH: 0, MEDIUM: 1, LOW: 2 }
 
@@ -7,6 +7,8 @@ export default function ResultsScreen({ result, onReset }) {
   const [filterFlag, setFilterFlag] = useState('')
   const [showOnlyFlagged, setShowOnlyFlagged] = useState(false)
   const [search, setSearch] = useState('')
+  const [finalizedGrids, setFinalizedGrids] = useState({})
+  const [generatingSlips, setGeneratingSlips] = useState(false)
 
   const employees = result.employees || []
   const perEmployee = result.perEmployee || {}
@@ -33,6 +35,81 @@ export default function ResultsScreen({ result, onReset }) {
     return [...set]
   }, [employees, perEmployee])
 
+  const sourceForFinalized = emp?.proposedGrid || emp?.originalGrid
+  const finalizedGrid = selectedEmp ? finalizedGrids[selectedEmp] : null
+  const effectiveFinalized = finalizedGrid || sourceForFinalized
+
+  const handleCopyFromProposed = useCallback(() => {
+    if (!selectedEmp || !emp?.proposedGrid) return
+    setFinalizedGrids((prev) => ({
+      ...prev,
+      [selectedEmp]: JSON.parse(JSON.stringify(emp.proposedGrid)),
+    }))
+  }, [selectedEmp, emp?.proposedGrid])
+
+  const handleCopyFromProposedForAll = useCallback(() => {
+    const next = {}
+    employees.forEach((e) => {
+      const g = perEmployee[e.emp_id]?.proposedGrid || perEmployee[e.emp_id]?.originalGrid
+      if (g) next[e.emp_id] = JSON.parse(JSON.stringify(g))
+    })
+    setFinalizedGrids(next)
+  }, [employees, perEmployee])
+
+  const handleCellChange = useCallback((date, code, value) => {
+    if (!selectedEmp) return
+    const src = finalizedGrids[selectedEmp] || perEmployee[selectedEmp]?.proposedGrid || perEmployee[selectedEmp]?.originalGrid
+    const g = src ? JSON.parse(JSON.stringify(src)) : { dates: [], codes: [], cells: {} }
+    if (!g.cells) g.cells = {}
+    if (!g.cells[date]) g.cells[date] = {}
+    const num = parseFloat(value)
+    if (!Number.isNaN(num) && num !== 0) {
+      g.cells[date][code] = num
+    } else {
+      delete g.cells[date][code]
+      if (Object.keys(g.cells[date]).length === 0) delete g.cells[date]
+    }
+    setFinalizedGrids((prev) => ({ ...prev, [selectedEmp]: g }))
+  }, [selectedEmp, perEmployee, finalizedGrids])
+
+  const handleGenerateSlips = useCallback(async () => {
+    setGeneratingSlips(true)
+    try {
+      const effectiveGrids = {}
+      employees.forEach((e) => {
+        const grid = finalizedGrids[e.emp_id] || perEmployee[e.emp_id]?.proposedGrid || perEmployee[e.emp_id]?.originalGrid
+        if (grid) effectiveGrids[e.emp_id] = grid
+      })
+      const res = await fetch('/api/generate-slips', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          periodEnd: result.periodEnd,
+          periodStart: result.periodStart,
+          employees,
+          finalizedGrids: effectiveGrids,
+        }),
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => null)
+        const msg = err?.detail || err?.error || res.statusText || 'Failed to generate PDFs'
+        throw new Error(Array.isArray(msg) ? msg.join('; ') : String(msg))
+      }
+      const blob = await res.blob()
+      const a = document.createElement('a')
+      a.href = URL.createObjectURL(blob)
+      const cd = res.headers.get('Content-Disposition')
+      const match = cd && cd.match(/filename="?([^";]+)"?/)
+      a.download = match ? match[1] : `Time_Exception_Slips_${result.periodEnd}.pdf`
+      a.click()
+      URL.revokeObjectURL(a.href)
+    } catch (err) {
+      alert(err.message || 'Failed to generate slips')
+    } finally {
+      setGeneratingSlips(false)
+    }
+  }, [result.periodEnd, result.periodStart, employees, finalizedGrids, perEmployee])
+
   return (
     <section className="results-screen">
       <header className="results-header">
@@ -40,9 +117,27 @@ export default function ResultsScreen({ result, onReset }) {
         <p className="period-range">
           {result.periodStart} – {result.periodEnd}
         </p>
-        <button type="button" className="btn-reset" onClick={onReset}>
-          New run
-        </button>
+        <div className="header-actions">
+          <button
+            type="button"
+            className="btn-copy-all"
+            onClick={handleCopyFromProposedForAll}
+            disabled={employees.length === 0}
+          >
+            Copy Proposed → Finalized (all)
+          </button>
+          <button
+            type="button"
+            className="btn-generate-slips"
+            onClick={handleGenerateSlips}
+            disabled={generatingSlips || employees.length === 0}
+          >
+            {generatingSlips ? 'Generating…' : 'Generate time exception slips'}
+          </button>
+          <button type="button" className="btn-reset" onClick={onReset}>
+            New run
+          </button>
+        </div>
       </header>
 
       {skipped.length > 0 && (
@@ -154,13 +249,13 @@ export default function ResultsScreen({ result, onReset }) {
                 <OriginalGrid grid={emp?.originalGrid} />
               </div>
 
+              {emp?.flags?.some((f) => f.code === 'REG_OT_CAP') && (
+                <div className="proposed-alert reg-ot-alert">
+                  <strong>REG/OT conversion applied</strong> — We converted REG hrs ↔ OT/CT 1.0 to reach 40. Double-check the OT bucket (OT 1.0 vs CT EARN 1.0) matches what the employee would want.
+                </div>
+              )}
               {emp?.proposedGrid && (
                 <>
-                  {emp?.flags?.some((f) => f.code === 'REG_OT_CAP') && (
-                    <div className="proposed-alert reg-ot-alert">
-                      <strong>REG/OT conversion applied</strong> — We converted REG hrs ↔ OT/CT 1.0 to reach 40. Double-check the OT bucket (OT 1.0 vs CT EARN 1.0) matches what the employee would want.
-                    </div>
-                  )}
                   <div className="proposed-totals-section">
                     <h4>Proposed totals</h4>
                     <p className="grid-hint">Totals after applying all suggestions</p>
@@ -181,11 +276,33 @@ export default function ResultsScreen({ result, onReset }) {
                   </div>
                   <div className="grid-section proposed-grid-section">
                     <h4>Proposed grid</h4>
-                    <p className="grid-hint">Result after applying all suggestions — copy into your spreadsheet</p>
+                    <p className="grid-hint">Result after applying all suggestions</p>
                     <OriginalGrid grid={emp.proposedGrid} />
                   </div>
                 </>
               )}
+
+              <div className="grid-section finalized-grid-section">
+                <h4>Finalized grid</h4>
+                <p className="grid-hint">
+                  Editable — use for time exception slip. Copy from Proposed first, then tweak if needed.
+                </p>
+                <div className="finalized-actions">
+                  <button
+                    type="button"
+                    className="btn-copy-proposed"
+                    onClick={handleCopyFromProposed}
+                    disabled={!emp?.proposedGrid}
+                  >
+                    Copy from Proposed
+                  </button>
+                </div>
+                {effectiveFinalized ? (
+                  <FinalizedGrid grid={effectiveFinalized} onCellChange={handleCellChange} />
+                ) : (
+                  <p className="hint">No hours data — copy from Proposed to start.</p>
+                )}
+              </div>
 
               {emp?.suggestions?.length > 0 && (
                 <details className="suggestions-section">
@@ -277,6 +394,54 @@ function OriginalGrid({ grid }) {
               <td>{d.display} {d.dow}</td>
               {grid.codes.map((c) => (
                 <td key={c}>{cells[d.date]?.[c] ?? ''}</td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+        <tfoot>
+          <tr className="grid-totals-row">
+            <td>Total</td>
+            {grid.codes.map((c) => (
+              <td key={c}>{colTotals[c] ? colTotals[c].toFixed(2) : ''}</td>
+            ))}
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  )
+}
+
+function FinalizedGrid({ grid, onCellChange }) {
+  if (!grid?.dates?.length || !grid?.codes?.length) return <p>No hours.</p>
+  const cells = grid.cells || {}
+  const colTotals = {}
+  grid.codes.forEach((c) => {
+    colTotals[c] = grid.dates.reduce((sum, d) => sum + (parseFloat(cells[d.date]?.[c]) || 0), 0)
+  })
+  return (
+    <div className="grid-wrap">
+      <table className="hours-grid finalized-grid">
+        <thead>
+          <tr>
+            <th>Date</th>
+            {grid.codes.map((c) => (
+              <th key={c}>{c}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {grid.dates.map((d) => (
+            <tr key={d.date}>
+              <td>{d.display} {d.dow}</td>
+              {grid.codes.map((c) => (
+                <td key={c}>
+                  <input
+                    type="text"
+                    size={4}
+                    value={cells[d.date]?.[c] ?? ''}
+                    onChange={(e) => onCellChange(d.date, c, e.target.value)}
+                  />
+                </td>
               ))}
             </tr>
           ))}

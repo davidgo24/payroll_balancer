@@ -11,6 +11,9 @@ node_modules/
 # Data (SQLite - local dev)
 data/
 
+# PDF template (copy from time-exception-slip-tool; see README)
+api/OT_Time_Exception_Slip_Sample.pdf
+
 # Env
 .env
 .env.local

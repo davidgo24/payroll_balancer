@@ -6,16 +6,22 @@ import json
 import os
 from pathlib import Path
 
-from fastapi import FastAPI, File, Form, UploadFile, HTTPException, Query
+from fastapi import FastAPI, File, Form, UploadFile, HTTPException, Query, Body
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 
 # Add project root to path
 import sys
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from payroll_balancer.loaders import load_tcp_csv, load_accrual_excel
+from payroll_balancer.pdf_slip import (
+    get_template_path,
+    grid_cells_to_ot_entries,
+    fill_single_pdf,
+    merge_pdfs,
+)
 from payroll_balancer.week_split import period_end_to_start, is_saturday, get_week_number
 from payroll_balancer.db import (
     init_db,
@@ -197,6 +203,78 @@ async def run(
         get_week_fn,
     )
     return result
+
+
+@app.post("/api/generate-slips")
+async def generate_slips(body: dict = Body(...)):
+    """
+    Generate Time Exception Slip PDFs from finalized grids.
+    Body: { periodEnd, employees: [{ emp_id, name, ... }], finalizedGrids: { emp_id: { cells, dates, codes } } }
+    Returns merged PDF for all employees with OT data (or blank slips if no OT).
+    """
+    period_end = body.get("periodEnd") or body.get("payPeriodEnd")
+    employees = body.get("employees", [])
+    finalized_grids = body.get("finalizedGrids", {})
+
+    if not period_end:
+        raise HTTPException(400, "periodEnd required")
+    if not employees:
+        raise HTTPException(400, "No employees provided")
+
+    template_path = get_template_path()
+    if not template_path:
+        raise HTTPException(
+            500,
+            "PDF template not found. Copy OT_Time_Exception_Slip_Sample.pdf from time-exception-slip-tool into api/ or project root.",
+        )
+    template_bytes = template_path.read_bytes()
+
+    pdf_list = []
+    for emp in employees:
+        emp_id = str(emp.get("emp_id", ""))
+        emp_name = emp.get("name", "")
+        parts = (emp_name or "").split(", ", 1)
+        last = parts[0] if parts else ""
+        first = parts[1] if len(parts) > 1 else ""
+        employee_dict = {
+            "emp_id": emp_id,
+            "emp_no": emp_id,
+            "name": emp_name,
+            "last": last,
+            "first": first,
+        }
+        grid = finalized_grids.get(emp_id)
+        ot_entries = None
+        if grid and grid.get("cells"):
+            ot_entries = grid_cells_to_ot_entries(
+                grid["cells"],
+                grid.get("dates", []),
+                body.get("periodStart", ""),
+            )
+        try:
+            pdf_bytes = fill_single_pdf(employee_dict, period_end, template_bytes, ot_entries)
+            pdf_list.append(pdf_bytes)
+        except Exception as e:
+            raise HTTPException(500, f"PDF generation failed for {emp_id}: {e}")
+
+    if not pdf_list:
+        raise HTTPException(400, "No PDFs generated")
+
+    merged = merge_pdfs(pdf_list)
+    from datetime import datetime
+    try:
+        end_dt = datetime.strptime(period_end, "%Y-%m-%d")
+    except ValueError:
+        end_dt = datetime.now()
+    filename = f"Time_Exception_Slips_{end_dt.strftime('%m-%d-%y')}.pdf"
+
+    return Response(
+        content=merged,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+        },
+    )
 
 
 # Serve React build in production — must be last so API routes match first

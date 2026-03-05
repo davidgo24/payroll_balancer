@@ -57,6 +57,20 @@ Use your 2.22-2.28.26.csv (week 1) and AccrualBalanceReport.xlsx:
 
 For append: upload week 2 CSV later with "Append Week 2" + select period 2026-03-07.
 
+## Time Exception Slip PDF export
+
+Generate pre-filled Time Exception Slip PDFs from the finalized grid (editable copy of Proposed).
+
+**PDF template required**: Copy `OT_Time_Exception_Slip_Sample.pdf` from [time-exception-slip-tool](https://github.com/davidgo24/time-exception-slip-tool) into `api/` or project root:
+
+```bash
+# Clone and copy template
+git clone https://github.com/davidgo24/time-exception-slip-tool.git /tmp/time-exception-slip-tool
+cp /tmp/time-exception-slip-tool/OT_Time_Exception_Slip_Sample.pdf api/
+```
+
+Flow: Select employee → **Copy from Proposed** → edit if needed → **Generate time exception slips** (downloads merged PDF for all employees).
+
 ## Deploy to Railway
 
 1. Push to GitHub and connect repo in [Railway](https://railway.app).

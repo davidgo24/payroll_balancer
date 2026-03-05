@@ -247,8 +247,52 @@ body {
   margin: 0;
 }
 
-.btn-reset {
+.header-actions {
   margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.btn-copy-all {
+  padding: 0.4rem 0.9rem;
+  background: transparent;
+  color: var(--accent);
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.btn-copy-all:hover:not(:disabled) {
+  background: rgba(88, 166, 255, 0.15);
+}
+
+.btn-copy-all:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-generate-slips {
+  padding: 0.4rem 0.9rem;
+  background: var(--success);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.btn-generate-slips:hover:not(:disabled) {
+  filter: brightness(1.1);
+}
+
+.btn-generate-slips:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btn-reset {
   padding: 0.4rem 0.9rem;
   background: transparent;
   border: 1px solid var(--border);
@@ -571,6 +615,50 @@ body {
 }
 
 .proposed-grid-section .hours-grid {
+  border-color: var(--accent);
+}
+
+.finalized-grid-section {
+  margin-top: 1.5rem;
+}
+
+.finalized-actions {
+  margin-bottom: 0.75rem;
+}
+
+.btn-copy-proposed {
+  padding: 0.35rem 0.75rem;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.btn-copy-proposed:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+
+.btn-copy-proposed:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.finalized-grid input {
+  width: 100%;
+  max-width: 4rem;
+  padding: 0.2rem 0.4rem;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text);
+  font-size: 0.85rem;
+  text-align: right;
+}
+
+.finalized-grid input:focus {
+  outline: none;
   border-color: var(--accent);
 }
 
