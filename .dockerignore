@@ -12,4 +12,3 @@ data/
 .env.*
 tests/
 *.md
-api/*.pdf
