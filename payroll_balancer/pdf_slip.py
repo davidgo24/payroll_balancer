@@ -143,22 +143,29 @@ def _aggregate_ot_by_week(ot_entries: list, wk1_start, wk1_end, wk2_start, wk2_e
 def grid_cells_to_ot_entries(cells: dict, dates_list: list = None, period_start: str = ""):
     """
     Convert Payroll Balancer grid cells to ot_data.entries format.
+    Only includes OT 1.0, OT 1.5, CT EARN 1.0, CT EARN 1.5 — nothing else.
     cells: { date: { code: hrs } }
     Returns entries: [{ date, category: ot10|ot15|cte10|cte15, hours }]
+    Merges by (date, category) to avoid double-counting if date keys vary (e.g. 2026-02-22 vs 2/22/2026).
     """
-    entries = []
+    merged: dict[tuple, float] = {}
     for date_str, code_hrs in cells.items():
         for code, hrs in code_hrs.items():
             code = str(code).strip()
             cat = CODE_TO_OT_CATEGORY.get(code)
             if not cat or float(hrs or 0) <= 0:
                 continue
-            entries.append({
-                "date": date_str,
-                "category": cat,
-                "hours": float(hrs),
-            })
-    return entries
+            try:
+                dt = _parse_date(date_str)
+                norm_date = dt.strftime("%Y-%m-%d")
+            except ValueError:
+                norm_date = str(date_str)
+            key = (norm_date, cat)
+            merged[key] = merged.get(key, 0.0) + float(hrs)
+    return [
+        {"date": k[0], "category": k[1], "hours": round(v, 2)}
+        for k, v in merged.items()
+    ]
 
 
 def _create_overlay(values: dict) -> bytes:
